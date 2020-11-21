@@ -16,6 +16,7 @@ public class ChatClient {
     private final String serverName;
     private final int serverPort;
     private PrintWriter serverOut;
+    private String uName = "guest";
 
     // Método a usar para acrescentar uma string à caixa de texto
     // * NÃO MODIFICAR *
@@ -63,10 +64,18 @@ public class ChatClient {
     // Método invocado sempre que o utilizador insere uma mensagem
     // na caixa de entrada
     public void newMessage(String message) throws IOException {
-      serverOut.println(message);
-      serverOut.flush();
+      if (!message.contains("/nick") && !message.contains("/bye")) {
+        serverOut.println(uName+": "+message);
+        serverOut.flush();
+      } else {
+        serverOut.println(message);
+        serverOut.flush();
+      }
     }
 
+    public void updateUname(String newUname) {
+      uName = newUname;
+    }
 
     // Método principal do objecto
     public void run() throws IOException, InterruptedException {
@@ -100,7 +109,6 @@ class ServerThread implements Runnable {
   private ChatClient client;
   private final LinkedList<String> msgToSend;
   private boolean hasMsg = false;
-  private String uName = "guest";
 
   public ServerThread(ChatClient client, Socket socket) {
     this.client = client;
@@ -126,16 +134,7 @@ class ServerThread implements Runnable {
         if (serverInStream.available() > 0) {
           if (serverIn.hasNextLine()) {
             String str = serverIn.nextLine();       // From server
-            if (str.contains("/nick")) {
-              uName = str.substring(6);
-            } else if (str.equals("BYE")) {
-              client.printMessage("*** Bye ***");
-              socket.close();
-              Thread.currentThread().interrupt();
-            } else {
-              client.printMessage(uName + ": " + str);
-              // For debugging -> System.out.println(str);
-            }
+            handleAnswer(str);
           }
         }
         if (hasMsg) {
@@ -150,6 +149,20 @@ class ServerThread implements Runnable {
       }
     } catch (IOException e) {
       e.printStackTrace();
+    }
+  }
+
+  public void handleAnswer(String answer) throws IOException {
+    if (answer.contains("/nick")) {
+      client.updateUname(answer.substring(6));
+    } else if (answer.equals("BYE")) {
+      client.printMessage("*** Bye ***");
+      socket.close();
+      Thread.currentThread().interrupt();
+    } else {
+      client.printMessage(answer);
+      //client.printMessage(uName + ": " + answer);
+      // For debugging -> System.out.println(str);
     }
   }
 }

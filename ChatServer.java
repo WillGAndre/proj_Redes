@@ -64,6 +64,7 @@ class ClientThread extends ChatServer implements Runnable {   // This will handl
   private Socket socket;
   private PrintWriter out;    // Write data to client
   private ChatServer server;
+  private String uName = "guest";
 
   public ClientThread(ChatServer server, Socket socket) {
     this.server = server;
@@ -79,29 +80,7 @@ class ClientThread extends ChatServer implements Runnable {   // This will handl
       while (!socket.isClosed()) {
         if (in.hasNextLine()) {
           String input = in.nextLine();
-          if (input.contains("/nick")) {
-            String cand_name = input.substring(6);
-            if (!server.lookupUname(cand_name)) {
-              server.addUname(cand_name);
-              out.println("/nick "+cand_name);
-              out.flush();
-            } else {
-              out.println("Name Taken!");
-              out.flush();
-            }
-          } else if (input.equals("/bye")) {
-            out.println("BYE");
-            out.flush();
-            Thread.currentThread().interrupt();
-          } else {
-            for (ClientThread client : server.getClients()) {
-              PrintWriter clientOut = client.getWriter();
-              if (clientOut != null) {
-                clientOut.println(input);
-                clientOut.flush();
-              }
-            }
-          }
+          handleRequest(input);
         }
       }
     } catch (IOException e) {
@@ -112,23 +91,48 @@ class ClientThread extends ChatServer implements Runnable {   // This will handl
   public PrintWriter getWriter() {
     return out;
   }
+
+  public void handleRequest(String input) throws IOException {
+    if (input.contains("/nick")) {
+      handleNick(input);
+    } else if (input.equals("/bye")) {
+      out.println("BYE");
+      out.flush();
+      Thread.currentThread().interrupt();
+    } else {
+      relayMessage(input);
+    } 
+  }
+
+  public void handleNick(String input) {
+    String cand_name = input.substring(6);
+      if (!server.lookupUname(cand_name)) {
+        String oldName = uName;
+        uName = cand_name;
+        server.addUname(cand_name);
+        out.println("/nick "+cand_name);    // Note -> *1
+        out.flush();
+        relayMessage("NEWNICK "+oldName+" "+uName);
+      } else {
+        out.println("ERROR");
+        out.flush();
+      }
+  }
+
+  public void relayMessage(String input) {
+    for (ClientThread client : server.getClients()) {
+      PrintWriter clientOut = client.getWriter();
+      if (clientOut != null) {
+        clientOut.println(input);
+        clientOut.flush();
+      }
+    }
+  }
 }
 
-// while(!socket.isClosed()) {
-//   if (in.hasNextLine()) {
-//     String input = in.nextLine();
-//     for (ClientThread client : server.getClients()) {
-//       PrintWriter clientOut = client.getWriter();
-//       if (clientOut != null) {
-//         clientOut.write(input + "\r\n");
-//         //clientOut.flush();
-//       }
-//     }
-//   }
-// }
-
-// while (!socket.isClosed() && ((str_in = clientIn.readLine()) != null)) {
-//   str_out = "test!";
-//   out.println(str_out);
-//   System.out.println("Got the msg!");
-// }
+/*
+  Instead of the "server" (ClientThread) sending a confirmation OK, it
+  sends back the nickname so the actual client can update its nickname.
+  If we were to send a OK confirmation, ambiguity would arise due to the 
+  message command also requesting OK confirmation or ERROR. -WA
+*/
