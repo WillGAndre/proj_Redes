@@ -11,6 +11,7 @@ public class ChatServer {
   private int serverPort;
   private List<ClientThread> clients;
   private List<String> unames;
+  private List<String> rooms;
 
   public static void main(String[] args) {
     ChatServer server = new ChatServer();
@@ -29,10 +30,19 @@ public class ChatServer {
     unames.add(uname);
   }
 
+  public boolean lookupRoom(String room) {
+    return rooms.contains(room);
+  }
+
+  public void addRoom(String room) {
+    rooms.add(room);
+  }
+
   private void start() {
     serverPort = portNumber;
     clients = new ArrayList<ClientThread>();
     unames = new ArrayList<String>();
+    rooms = new ArrayList<String>();
     ServerSocket serverSocket = null;
     try {
       serverSocket = new ServerSocket(serverPort);
@@ -65,6 +75,7 @@ class ClientThread extends ChatServer implements Runnable {   // This will handl
   private PrintWriter out;    // Write data to client
   private ChatServer server;
   private String uName = "guest";
+  private String room = "outside";  // Same as being null
 
   public ClientThread(ChatServer server, Socket socket) {
     this.server = server;
@@ -92,19 +103,42 @@ class ClientThread extends ChatServer implements Runnable {   // This will handl
     return out;
   }
 
+  public String getRoom() {
+    return room;
+  }
+
   public void handleRequest(String input) throws IOException {
-    if (input.contains("/nick")) {
+    if (input.contains("/leave")) {
+      room = "outside";
+    } else if (input.contains("/join")) {
+      handleJoin(input);
+    } else if (input.contains("/nick")) {
       handleNick(input);
     } else if (input.equals("/bye")) {
       out.println("BYE");
       out.flush();
+      if (room != "outside") {
+       relayMessage("LEFT "+uName); 
+      }
       Thread.currentThread().interrupt();
     } else {
       relayMessage(input);
     } 
   }
 
-  public void handleNick(String input) {
+  public void handleJoin(String input) {  // /join test
+    String input_room = input.substring(6);
+    if (!server.lookupRoom(input_room)) {
+      server.addRoom(input_room);
+    }
+    if (room != "outside") {
+      relayMessage("LEFT "+uName);
+    }
+    room = input_room;
+    relayMessage("JOINED "+uName);
+  }
+
+  public void handleNick(String input) {  // /nick nickname
     String cand_name = input.substring(6);
       if (!server.lookupUname(cand_name)) {
         String oldName = uName;
@@ -120,9 +154,11 @@ class ClientThread extends ChatServer implements Runnable {   // This will handl
   }
 
   public void relayMessage(String input) {
+    String clientRoom = room;
     for (ClientThread client : server.getClients()) {
       PrintWriter clientOut = client.getWriter();
-      if (clientOut != null) {
+      String clientOutRoom = client.getRoom();
+      if (clientOut != null && clientRoom.equals(clientOutRoom)) {
         clientOut.println(input);
         clientOut.flush();
       }

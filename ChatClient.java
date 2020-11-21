@@ -64,12 +64,13 @@ public class ChatClient {
     // Método invocado sempre que o utilizador insere uma mensagem
     // na caixa de entrada
     public void newMessage(String message) throws IOException {
-      if (!message.contains("/nick") && !message.contains("/bye")) {
-        serverOut.println(uName+": "+message);
+      if (!message.contains("/nick") && !message.contains("/bye") 
+        && !message.contains("/join") && !message.contains("/leave")) {   // This if is only here to make input more readable 
+        serverOut.println(uName+": "+message);                            // MUST REMOVE (!!!)
         serverOut.flush();
       } else {
-        serverOut.println(message);
-        serverOut.flush();
+      serverOut.println(message);
+      serverOut.flush();
       }
     }
 
@@ -116,7 +117,7 @@ class ServerThread implements Runnable {
     this.msgToSend = new LinkedList<String>();
   }
 
-  public void addNextMessage(String msg) {      // synchronized  msg between threads
+  public void addNextMessage(String msg) {      // synchronized msg between threads
     synchronized (msgToSend) {
       hasMsg = true;
       msgToSend.push(msg);
