@@ -9,8 +9,8 @@ import java.util.List;
 public class ChatServer {
   private static final int portNumber = 4444; // args[0]
   private int serverPort;
-  private List<ClientThread> clients;
-  private List<String> unames;
+  private List<ServerThread> clients;
+  private Map<String,Boolean> unames;
   private List<String> rooms;
 
   public static void main(String[] args) {
@@ -18,16 +18,24 @@ public class ChatServer {
     server.start();
   }
 
-  public List<ClientThread> getClients() {
+  public List<ServerThread> getClients() {
     return clients;
   }
 
   public boolean lookupUname(String uname) {
-    return unames.contains(uname);
+    return unames.containsKey(uname);
+  }
+
+  public boolean getValue(String uname) {
+    return unames.get(uname);
   }
 
   public void addUname(String uname) {
-    unames.add(uname);
+    unames.put(uname,true);
+  }
+
+  public void removeUname(String uname) {
+    unames.put(uname,false);
   }
 
   public boolean lookupRoom(String room) {
@@ -40,8 +48,8 @@ public class ChatServer {
 
   private void start() {
     serverPort = portNumber;
-    clients = new ArrayList<ClientThread>();
-    unames = new ArrayList<String>();
+    clients = new ArrayList<ServerThread>();
+    unames = new HashMap<>();
     rooms = new ArrayList<String>();
     ServerSocket serverSocket = null;
     try {
@@ -59,7 +67,7 @@ public class ChatServer {
       try {
         Socket socket = serverSocket.accept();
         System.out.println("accepted: "+socket.getRemoteSocketAddress());
-        ClientThread client = new ClientThread(this, socket);
+        ServerThread client = new ServerThread(this, socket);
         Thread thread = new Thread(client);
         thread.start();
         clients.add(client);
@@ -70,14 +78,15 @@ public class ChatServer {
   }
 }
 
-class ClientThread extends ChatServer implements Runnable {   // This will handle the client
+class ServerThread extends ChatServer implements Runnable {   // This will handle the client
   private Socket socket;
   private PrintWriter out;    // Write data to client
   private ChatServer server;
-  private String uName = "guest";
-  private String room = "outside";  // Same as being null
+  private String uName = "guest";   // Name of associated client
+  private String room = "outside";  // Room of associated client (outside -> Same as being null)
+  private String state = "init";    // Current state of client
 
-  public ClientThread(ChatServer server, Socket socket) {
+  public ServerThread(ChatServer server, Socket socket) {
     this.server = server;
     this.socket = socket;
   }
@@ -107,9 +116,18 @@ class ClientThread extends ChatServer implements Runnable {   // This will handl
     return room;
   }
 
+  public String getNick() {
+    return uName;
+  }
+
   public void handleRequest(String input) throws IOException {
     if (input.contains("/leave")) {
-      room = "outside";
+      if (!room.equals("outside")) {
+        out.println("OK");
+        out.flush();
+        relayMessage("LEFT "+uName);
+        room = "outside";
+      }
     } else if (input.contains("/join")) {
       handleJoin(input);
     } else if (input.contains("/nick")) {
@@ -117,48 +135,112 @@ class ClientThread extends ChatServer implements Runnable {   // This will handl
     } else if (input.equals("/bye")) {
       out.println("BYE");
       out.flush();
-      if (room != "outside") {
+      if (!room.equals("outside")) {
        relayMessage("LEFT "+uName); 
       }
       Thread.currentThread().interrupt();
     } else {
-      relayMessage(input);
+      sendMsg(input);
     } 
   }
 
-  public void handleJoin(String input) {  // /join test
+  public void sendMsg(String input) {
+    String clientRoom = room;
+    String clientUname = uName;
+    for (ServerThread client : server.getClients()) {
+      PrintWriter clientOut = client.getWriter();
+      String clientOutRoom = client.getRoom();
+      if (clientOut != null && clientRoom.equals(clientOutRoom)) {
+        clientOut.println(clientUname+": "+input);
+        clientOut.flush();
+      }
+    }
+  }
+
+  public void handleJoin(String input) {  // Done
     String input_room = input.substring(6);
+    state = "inside";
+    out.println("OK");
+    out.flush();
     if (!server.lookupRoom(input_room)) {
       server.addRoom(input_room);
     }
-    if (room != "outside") {
+    if (!room.equals("outside")) {
       relayMessage("LEFT "+uName);
     }
     room = input_room;
     relayMessage("JOINED "+uName);
   }
 
-  public void handleNick(String input) {  // /nick nickname
+  public void handleNick(String input) {  // Done , needs refactoring (!)
     String cand_name = input.substring(6);
+    if (state.equals("init")) {
       if (!server.lookupUname(cand_name)) {
-        String oldName = uName;
         uName = cand_name;
         server.addUname(cand_name);
-        out.println("/nick "+cand_name);    // Note -> *1
+        state = "outside";
+        out.println("OK");
+        out.flush();
+      } else if (!server.getValue(cand_name)) {
+        server.removeUname(uName);
+        server.addUname(cand_name);
+        uName = cand_name;
+        state = "outside";
+        out.println("OK");
+        out.flush();
+      } else {
+        out.println("ERROR");
+        out.flush();
+      }
+    } else if (state.equals("outside")) {
+      if (!server.lookupUname(cand_name)) {
+        server.removeUname(uName);
+        uName = cand_name;
+        server.addUname(cand_name);
+        out.println("OK");
+        out.flush();
+      } else if (!server.getValue(cand_name)) {
+        server.removeUname(uName);
+        server.addUname(cand_name);
+        uName = cand_name;
+        out.println("OK");
+        out.flush();
+      } else {
+        out.println("ERROR");
+        out.flush();
+      }
+    } else if (!room.equals("outside")) { // State.equals("inside")
+      if (!server.lookupUname(cand_name)) {
+        String oldName = uName;
+        server.removeUname(uName);
+        server.addUname(cand_name);
+        uName = cand_name;
+        out.println("OK");
+        out.flush();
+        relayMessage("NEWNICK "+oldName+" "+uName);
+      } else if (!server.getValue(cand_name)) {
+        String oldName = uName;
+        server.removeUname(uName);
+        server.addUname(cand_name);
+        uName = cand_name;
+        out.println("OK");
         out.flush();
         relayMessage("NEWNICK "+oldName+" "+uName);
       } else {
         out.println("ERROR");
         out.flush();
       }
+    }
   }
 
   public void relayMessage(String input) {
     String clientRoom = room;
-    for (ClientThread client : server.getClients()) {
+    String clientUname = uName;
+    for (ServerThread client : server.getClients()) {
       PrintWriter clientOut = client.getWriter();
       String clientOutRoom = client.getRoom();
-      if (clientOut != null && clientRoom.equals(clientOutRoom)) {
+      String clientOutNick = client.getNick();
+      if (clientOut != null && clientRoom.equals(clientOutRoom) && !clientUname.equals(clientOutNick)) {
         clientOut.println(input);
         clientOut.flush();
       }

@@ -16,7 +16,7 @@ public class ChatClient {
     private final String serverName;
     private final int serverPort;
     private PrintWriter serverOut;
-    private String uName = "guest";
+    // private String uName = "guest";
 
     // Método a usar para acrescentar uma string à caixa de texto
     // * NÃO MODIFICAR *
@@ -64,19 +64,13 @@ public class ChatClient {
     // Método invocado sempre que o utilizador insere uma mensagem
     // na caixa de entrada
     public void newMessage(String message) throws IOException {
-      if (!message.contains("/nick") && !message.contains("/bye") 
-        && !message.contains("/join") && !message.contains("/leave")) {   // This if is only here to make input more readable 
-        serverOut.println(uName+": "+message);                            // MUST REMOVE (!!!)
-        serverOut.flush();
-      } else {
       serverOut.println(message);
       serverOut.flush();
-      }
     }
 
-    public void updateUname(String newUname) {
-      uName = newUname;
-    }
+    // public void updateUname(String newUname) {
+    //   uName = newUname;
+    // }
 
     // Método principal do objecto
     public void run() throws IOException, InterruptedException {
@@ -85,13 +79,13 @@ public class ChatClient {
       this.serverOut = new PrintWriter(socket.getOutputStream(), false);
       Thread.sleep(1000);
 
-      ServerThread serverThread = new ServerThread(this, socket);
-      Thread serverAccessThread = new Thread(serverThread);
-      serverAccessThread.start();
+      ClientThread clientThread = new ClientThread(this, socket);
+      Thread clientAccessThread = new Thread(clientThread);
+      clientAccessThread.start();
 
-      while (serverAccessThread.isAlive()) {
+      while (clientAccessThread.isAlive()) {
         if (in.hasNextLine()) {   // Blocks thread, waits for input
-          serverThread.addNextMessage(in.nextLine());
+          clientThread.addNextMessage(in.nextLine());
         }
       }
     }
@@ -105,13 +99,13 @@ public class ChatClient {
 
 }
 
-class ServerThread implements Runnable {
+class ClientThread implements Runnable {
   private Socket socket;
   private ChatClient client;
   private final LinkedList<String> msgToSend;
   private boolean hasMsg = false;
 
-  public ServerThread(ChatClient client, Socket socket) {
+  public ClientThread(ChatClient client, Socket socket) {
     this.client = client;
     this.socket = socket;
     this.msgToSend = new LinkedList<String>();
@@ -154,15 +148,12 @@ class ServerThread implements Runnable {
   }
 
   public void handleAnswer(String answer) throws IOException {
-    if (answer.contains("/nick")) {
-      client.updateUname(answer.substring(6));
-    } else if (answer.equals("BYE")) {
-      client.printMessage("*** Bye ***");
+    if (answer.equals("BYE")) {
+      client.printMessage("*** Bye ***");   // Must remove (!!)
       socket.close();
       Thread.currentThread().interrupt();
     } else {
       client.printMessage(answer);
-      //client.printMessage(uName + ": " + answer);
       // For debugging -> System.out.println(str);
     }
   }
