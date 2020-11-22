@@ -149,7 +149,6 @@ class ClientThread implements Runnable {
 
   public void handleAnswer(String answer) throws IOException {
     if (answer.equals("BYE")) {
-      client.printMessage("*** Bye ***");   // Must remove (!!)
       socket.close();
       Thread.currentThread().interrupt();
     } else {

@@ -121,7 +121,9 @@ class ServerThread extends ChatServer implements Runnable {   // This will handl
   }
 
   public void handleRequest(String input) throws IOException {
-    if (input.contains("/leave")) {
+    if (input.contains("/priv")) {
+      handlePriv(input);
+    } else if (input.contains("/leave")) {
       if (!room.equals("outside")) {
         out.println("OK");
         out.flush();
@@ -154,6 +156,27 @@ class ServerThread extends ChatServer implements Runnable {   // This will handl
         clientOut.println(clientUname+": "+input);
         clientOut.flush();
       }
+    }
+  }
+
+  public void handlePriv(String input) {    // Done
+    String input_name = input.substring(6,10);
+    String input_msg = input.substring(11);
+    boolean flag = false;
+    for (ServerThread client : server.getClients()) {
+      String clientOutNick = client.getNick();
+      if (clientOutNick.equals(input_name)) {
+        PrintWriter clientOut = client.getWriter();
+        clientOut.println(input_msg);
+        clientOut.flush();
+        out.println("OK");
+        out.flush();
+        flag = true;
+      }
+    }
+    if (!flag) {
+      out.println("ERROR");
+      out.flush();
     }
   }
 
@@ -217,7 +240,7 @@ class ServerThread extends ChatServer implements Runnable {   // This will handl
         uName = cand_name;
         out.println("OK");
         out.flush();
-        relayMessage("NEWNICK "+oldName+" "+uName);
+        relayMessage(oldName+" changed name to "+uName); //relayMessage("NEWNICK "+oldName+" "+uName);
       } else if (!server.getValue(cand_name)) {
         String oldName = uName;
         server.removeUname(uName);
@@ -225,7 +248,7 @@ class ServerThread extends ChatServer implements Runnable {   // This will handl
         uName = cand_name;
         out.println("OK");
         out.flush();
-        relayMessage("NEWNICK "+oldName+" "+uName);
+        relayMessage(oldName+" changed name to "+uName); //relayMessage("NEWNICK "+oldName+" "+uName);
       } else {
         out.println("ERROR");
         out.flush();
@@ -247,10 +270,3 @@ class ServerThread extends ChatServer implements Runnable {   // This will handl
     }
   }
 }
-
-/*
-  Instead of the "server" (ClientThread) sending a confirmation OK, it
-  sends back the nickname so the actual client can update its nickname.
-  If we were to send a OK confirmation, ambiguity would arise due to the 
-  message command also requesting OK confirmation or ERROR. -WA
-*/
