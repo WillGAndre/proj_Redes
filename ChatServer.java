@@ -159,15 +159,17 @@ class ServerThread extends ChatServer implements Runnable {   // This will handl
     }
   }
 
-  public void handlePriv(String input) {    // Done
+  public void handlePriv(String input) {    // Working but has bug, some clients cant send others cant
     String input_name = input.substring(6,10);
+    // System.out.println("input_name "+input_name);
     String input_msg = input.substring(11);
     boolean flag = false;
     for (ServerThread client : server.getClients()) {
+      PrintWriter clientOut = client.getWriter();
       String clientOutNick = client.getNick();
+      // System.out.println("Client "+clientOutNick);
       if (clientOutNick.equals(input_name)) {
-        PrintWriter clientOut = client.getWriter();
-        clientOut.println(input_msg);
+        clientOut.println("PRIVATE "+input_name+" "+input_msg);
         clientOut.flush();
         out.println("OK");
         out.flush();
@@ -195,7 +197,7 @@ class ServerThread extends ChatServer implements Runnable {   // This will handl
     relayMessage("JOINED "+uName);
   }
 
-  public void handleNick(String input) {  // Done , needs refactoring (!)
+  public void handleNick(String input) {  // Done
     String cand_name = input.substring(6);
     if (state.equals("init")) {
       if (!server.lookupUname(cand_name)) {
