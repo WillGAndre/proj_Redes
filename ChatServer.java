@@ -1,9 +1,6 @@
 import java.io.*;
 import java.net.*;
 import java.util.*;
-import java.awt.*;
-import java.awt.event.*;
-import javax.swing.*;
 import java.util.List;
 
 public class ChatServer {
@@ -159,17 +156,16 @@ class ServerThread extends ChatServer implements Runnable {   // This will handl
     }
   }
 
-  public void handlePriv(String input) {    // Working but has bug, some clients cant send others cant
-    String input_name = input.substring(6,10);
-    // System.out.println("input_name "+input_name);
-    String input_msg = input.substring(11);
+  public void handlePriv(String input) {    // Done
+    String input_name = input.substring(6,10).trim();
+    String input_msg = input.substring(10).trim();
+    String sender_name = getNick();
     boolean flag = false;
     for (ServerThread client : server.getClients()) {
       PrintWriter clientOut = client.getWriter();
       String clientOutNick = client.getNick();
-      // System.out.println("Client "+clientOutNick);
       if (clientOutNick.equals(input_name)) {
-        clientOut.println("PRIVATE "+input_name+" "+input_msg);
+        clientOut.println("PRIVATE "+sender_name+" "+input_msg);
         clientOut.flush();
         out.println("OK");
         out.flush();

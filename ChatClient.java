@@ -88,6 +88,7 @@ public class ChatClient {
           clientThread.addNextMessage(in.nextLine());
         }
       }
+      in.close();
     }
 
     // Instancia o ChatClient e arranca-o invocando o seu método run()
@@ -142,6 +143,7 @@ class ClientThread implements Runnable {
           serverOut.flush();
         }
       }
+      serverIn.close();
     } catch (IOException e) {
       e.printStackTrace();
     }
