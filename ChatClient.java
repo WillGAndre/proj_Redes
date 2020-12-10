@@ -64,13 +64,14 @@ public class ChatClient {
     // Método invocado sempre que o utilizador insere uma mensagem
     // na caixa de entrada
     public void newMessage(String message) throws IOException {
+      if (!(message.contains("/priv") || message.contains("/leave") || message.contains("/join") || message.contains("/nick") 
+      || message.contains("/bye")) && message.contains("/")) {
+        message = '/'+message;
+        // System.out.println("Msg: "+message);
+      }
       serverOut.println(message);
       serverOut.flush();
     }
-
-    // public void updateUname(String newUname) {
-    //   uName = newUname;
-    // }
 
     // Método principal do objecto
     public void run() throws IOException, InterruptedException {
@@ -82,12 +83,6 @@ public class ChatClient {
       ClientThread clientThread = new ClientThread(this, socket);
       Thread clientAccessThread = new Thread(clientThread);
       clientAccessThread.start();
-
-      while (clientAccessThread.isAlive()) {
-        if (in.hasNextLine()) {   // Blocks thread, waits for input
-          clientThread.addNextMessage(in.nextLine());
-        }
-      }
       in.close();
     }
 
@@ -103,20 +98,10 @@ public class ChatClient {
 class ClientThread implements Runnable {
   private Socket socket;
   private ChatClient client;
-  private final LinkedList<String> msgToSend;
-  private boolean hasMsg = false;
 
   public ClientThread(ChatClient client, Socket socket) {
     this.client = client;
     this.socket = socket;
-    this.msgToSend = new LinkedList<String>();
-  }
-
-  public void addNextMessage(String msg) {      // synchronized msg between threads
-    synchronized (msgToSend) {
-      hasMsg = true;
-      msgToSend.push(msg);
-    }
   }
 
   @Override
@@ -124,7 +109,6 @@ class ClientThread implements Runnable {
     try {
       InputStream serverInStream = socket.getInputStream();
       Scanner serverIn = new Scanner(serverInStream);
-      PrintWriter serverOut = new PrintWriter(socket.getOutputStream(), false);
 
       while (!socket.isClosed()) {
         if (serverInStream.available() > 0) {
@@ -132,15 +116,6 @@ class ClientThread implements Runnable {
             String str = serverIn.nextLine();       // From server
             handleAnswer(str);
           }
-        }
-        if (hasMsg) {
-          String nxtSend = "";
-          synchronized (msgToSend) {
-            nxtSend = msgToSend.pop();
-            hasMsg = !msgToSend.isEmpty();
-          }
-          serverOut.println(nxtSend);               // To server
-          serverOut.flush();
         }
       }
       serverIn.close();
@@ -153,9 +128,9 @@ class ClientThread implements Runnable {
     if (answer.equals("BYE")) {
       socket.close();
       Thread.currentThread().interrupt();
+      System.exit(0);
     } else {
       client.printMessage(answer);
-      // For debugging -> System.out.println(str);
     }
   }
 }

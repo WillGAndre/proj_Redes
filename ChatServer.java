@@ -53,23 +53,23 @@ public class ChatServer {
       serverSocket = new ServerSocket(serverPort);
       acceptClients(serverSocket);
     } catch (IOException e) {
-      System.err.println("Could not list on: "+serverPort);
+      // System.err.println("Could not list on: "+serverPort);
       System.exit(1);
     }
   }
 
   private void acceptClients(ServerSocket serverSocket) {
-    System.out.println("server started on: " +serverSocket.getLocalSocketAddress());
+    // System.out.println("server started on: " +serverSocket.getLocalSocketAddress());
     while(true) {
       try {
         Socket socket = serverSocket.accept();
-        System.out.println("accepted: "+socket.getRemoteSocketAddress());
+        // System.out.println("accepted: "+socket.getRemoteSocketAddress());
         ServerThread client = new ServerThread(this, socket);
         Thread thread = new Thread(client);
         thread.start();
         clients.add(client);
       } catch (IOException e) {
-        System.out.println("Could not accept client on: "+serverPort);
+        // System.out.println("Could not accept client on: "+serverPort);
       }
     }
   }
@@ -94,11 +94,19 @@ class ServerThread extends ChatServer implements Runnable {   // This will handl
       this.out = new PrintWriter(socket.getOutputStream(), false);
       Scanner in = new Scanner(socket.getInputStream());
 
+      String input = "";
       while (!socket.isClosed()) {
-        if (in.hasNextLine()) {
-          String input = in.nextLine();
+        if (in.hasNextLine() && (input += in.nextLine()) != null) {
+          // System.out.println("Input "+input);
+          while (input.contains("^D")) {
+            input = input.replace("^D","");
+          }
+          // System.out.println("New Input "+input);
+        }
+        if (input != null && !input.equals("")) {
           handleRequest(input);
         }
+        input = "";
       }
     } catch (IOException e) {
       e.printStackTrace();
@@ -137,9 +145,19 @@ class ServerThread extends ChatServer implements Runnable {   // This will handl
       if (!room.equals("outside")) {
        relayMessage("LEFT "+uName); 
       }
+      socket.close();
       Thread.currentThread().interrupt();
     } else {
-      sendMsg(input);
+      if (!room.equals("outside")) {
+        if (input.contains("/")) {    // Before sending msg check for '/', if found remove '/'
+          input = input.substring(1);
+        }
+        // System.out.println("new input "+input);
+        sendMsg(input);
+      } else {
+        out.println("ERROR");
+        out.flush();
+      }
     } 
   }
 
@@ -238,7 +256,7 @@ class ServerThread extends ChatServer implements Runnable {   // This will handl
         uName = cand_name;
         out.println("OK");
         out.flush();
-        relayMessage(oldName+" changed name to "+uName); //relayMessage("NEWNICK "+oldName+" "+uName);
+        relayMessage(oldName+" mudou de nome para "+uName); //relayMessage("NEWNICK "+oldName+" "+uName);
       } else if (!server.getValue(cand_name)) {
         String oldName = uName;
         server.removeUname(uName);
@@ -246,7 +264,7 @@ class ServerThread extends ChatServer implements Runnable {   // This will handl
         uName = cand_name;
         out.println("OK");
         out.flush();
-        relayMessage(oldName+" changed name to "+uName); //relayMessage("NEWNICK "+oldName+" "+uName);
+        relayMessage(oldName+" mudou de nome para "+uName); //relayMessage("NEWNICK "+oldName+" "+uName);
       } else {
         out.println("ERROR");
         out.flush();
